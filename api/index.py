@@ -76,6 +76,17 @@ class FailureOnset(BaseModel):
     )
 
 
+def compute_reliability_score(sub_scores: "SubScores") -> int:
+    """Weighted-average of sub-scores, rounded and clamped to [1, 10]."""
+    raw = (
+        0.4 * sub_scores.design
+        + 0.3 * sub_scores.mileage
+        + 0.2 * sub_scores.usage
+        + 0.1 * sub_scores.age
+    )
+    return max(1, min(10, round(raw)))
+
+
 class EngineReport(BaseModel):
     engine_code: str = Field(description="The identified engine code/designation (e.g. OM651)")
     reliability_score: int = Field(description="Final 1-10 score computed from sub-scores (weighted average).", ge=1, le=10)
