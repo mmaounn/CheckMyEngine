@@ -42,9 +42,45 @@ class AnalyzeRequest(BaseModel):
     )
 
 
+class SubScores(BaseModel):
+    design: int = Field(
+        description="1-10. Intrinsic quality of the engine family (design soundness + severity of known issues), independent of this specific vehicle.",
+        ge=1,
+        le=10,
+    )
+    mileage: int = Field(
+        description="1-10. How far into this engine's typical failure window the car sits. 10 = <25% of onset, 7 = 50-75%, 5 = at onset, 3 = 100-130%, 1 = >130%.",
+        ge=1,
+        le=10,
+    )
+    usage: int = Field(
+        description="1-10. Combined history judgment: owner count, commercial/rental/taxi use, accidents, explicit chip tuning.",
+        ge=1,
+        le=10,
+    )
+    age: int = Field(
+        description="1-10. Age since first registration relative to engine's typical durability. 10 = <3 years, 7 = 5-8, 5 = 10, 3 = 15+, 1 = 20+.",
+        ge=1,
+        le=10,
+    )
+
+
+class FailureOnset(BaseModel):
+    years: int = Field(
+        description="Typical age in years at which meaningful issues begin to surface for this engine family.",
+        ge=0,
+    )
+    mileage_km: int = Field(
+        description="Typical odometer reading at which meaningful issues begin to surface for this engine family.",
+        ge=0,
+    )
+
+
 class EngineReport(BaseModel):
     engine_code: str = Field(description="The identified engine code/designation (e.g. OM651)")
-    reliability_score: int = Field(description="Score from 1-10, where 10 is most reliable", ge=1, le=10)
+    reliability_score: int = Field(description="Final 1-10 score computed from sub-scores (weighted average).", ge=1, le=10)
+    sub_scores: SubScores = Field(description="Breakdown of the rubric factors that produce the final score.")
+    typical_failure_onset: FailureOnset = Field(description="Point estimate of when issues typically start for this engine family.")
     summary: str = Field(description="2-3 sentence verdict on engine reputation, reliability, and mileage risk")
 
 
