@@ -206,7 +206,8 @@ AUTO_DETECT_INSTRUCTION = "Write the summary in the same language as the vehicle
 
 
 async def analyze_engine(vehicle_data: str, language: str | None = None) -> EngineReport:
-    """Send vehicle data to Claude and get a structured engine reliability report."""
+    """Send vehicle data to Claude, parse the structured rubric output, and
+    compute the final reliability_score from the sub-scores."""
     api_key = os.environ["ANTHROPIC_API_KEY"]
     client = anthropic.AsyncAnthropic(api_key=api_key)
     if language:
@@ -239,7 +240,18 @@ async def analyze_engine(vehicle_data: str, language: str | None = None) -> Engi
         raw = raw.rsplit("```", 1)[0].strip()
 
     data = json.loads(raw)
-    return EngineReport(**data)
+
+    sub_scores = SubScores(**data["sub_scores"])
+    failure_onset = FailureOnset(**data["typical_failure_onset"])
+    reliability_score = compute_reliability_score(sub_scores)
+
+    return EngineReport(
+        engine_code=data["engine_code"],
+        reliability_score=reliability_score,
+        sub_scores=sub_scores,
+        typical_failure_onset=failure_onset,
+        summary=data["summary"],
+    )
 
 
 # --- FastAPI App ---
