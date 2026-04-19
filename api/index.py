@@ -263,6 +263,13 @@ tuning note explicitly describes it (e.g. "Chiptuning", "Leistungssteigerung", \
 (AHK), auxiliary heater (Standheizung), audio system, or lighting upgrades are \
 NOT engine tuning and must not be treated as wear/warranty risk.
 
+6. **Registration-document priority.** If the input begins with a \
+`[Extracted from vehicle registration]` block, treat those fields as \
+authoritative for engine identification. If they conflict with the \
+listing text (e.g. listing says "177 HP" but registration says \
+"126 kW" which is 171 HP), prefer the registration values. Use the \
+`engine_variant_code` as the primary engine identifier.
+
 ## Rubric (sub-scores, 1-10 each)
 
 Score each factor independently:
@@ -329,9 +336,32 @@ LANGUAGE_INSTRUCTIONS = {
 AUTO_DETECT_INSTRUCTION = "Write the summary in the same language as the vehicle listing input."
 
 
-async def analyze_engine(vehicle_data: str, language: str | None = None) -> EngineReport:
-    """Send vehicle data to Claude, parse the structured rubric output, and
-    compute the final reliability_score from the sub-scores."""
+async def analyze_engine(
+    vehicle_data: str,
+    language: str | None = None,
+    vehicle_doc_image_url: str | None = None,
+) -> tuple[EngineReport, bool, str | None]:
+    """Send vehicle data (optionally enriched by a Fahrzeugschein image) to Claude,
+    parse the structured rubric output, and compute the final reliability_score.
+
+    Returns (report, image_used, image_error).
+    """
+    image_used = False
+    image_error: str | None = None
+    merged_vehicle_data = vehicle_data
+
+    if vehicle_doc_image_url is not None:
+        specs, error = await extract_specs_from_image(vehicle_doc_image_url)
+        if specs is not None:
+            block = _format_extracted_block(specs)
+            if block is not None:
+                merged_vehicle_data = f"{block}\n\n[Listing text]\n{vehicle_data}"
+                image_used = True
+            else:
+                image_error = "unreadable_document"
+        else:
+            image_error = error
+
     api_key = os.environ["ANTHROPIC_API_KEY"]
     client = anthropic.AsyncAnthropic(api_key=api_key)
     if language:
@@ -350,7 +380,7 @@ async def analyze_engine(vehicle_data: str, language: str | None = None) -> Engi
                 "content": (
                     "Analyze the engine in this vehicle listing and produce "
                     f"the reliability report as JSON. {lang_instruction}\n\n"
-                    f"{vehicle_data}"
+                    f"{merged_vehicle_data}"
                 ),
             }
         ],
@@ -358,7 +388,6 @@ async def analyze_engine(vehicle_data: str, language: str | None = None) -> Engi
 
     raw = message.content[0].text.strip()
 
-    # Handle case where model wraps JSON in code fences despite instructions
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
@@ -369,13 +398,15 @@ async def analyze_engine(vehicle_data: str, language: str | None = None) -> Engi
     failure_onset = FailureOnset(**data["typical_failure_onset"])
     reliability_score = compute_reliability_score(sub_scores)
 
-    return EngineReport(
+    report = EngineReport(
         engine_code=data["engine_code"],
         reliability_score=reliability_score,
         sub_scores=sub_scores,
         typical_failure_onset=failure_onset,
         summary=data["summary"],
     )
+
+    return report, image_used, image_error
 
 
 # --- FastAPI App ---
@@ -391,10 +422,20 @@ app = FastAPI(
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest, _key: str = Security(verify_api_key)):
-    """Analyze a vehicle's engine reliability based on listing data."""
+    """Analyze a vehicle's engine reliability based on listing data and an optional
+    Fahrzeugschein image URL."""
     try:
-        report = await analyze_engine(request.vehicle_data, request.language)
-        return AnalyzeResponse(success=True, report=report)
+        report, image_used, image_error = await analyze_engine(
+            request.vehicle_data,
+            request.language,
+            request.vehicle_doc_image_url,
+        )
+        return AnalyzeResponse(
+            success=True,
+            report=report,
+            image_used=image_used,
+            image_error=image_error,
+        )
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"Failed to parse engine analysis: {e}")
     except Exception as e:
