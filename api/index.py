@@ -2,8 +2,20 @@ import json
 import os
 
 import anthropic
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Security
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
+
+# --- Auth ---
+
+API_KEY_HEADER = APIKeyHeader(name="X-API-Key")
+
+
+def verify_api_key(api_key: str = Security(API_KEY_HEADER)) -> str:
+    valid_keys = set(os.environ.get("CME_API_KEYS", "").split(","))
+    if api_key not in valid_keys:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    return api_key
 
 # --- Models ---
 
@@ -147,7 +159,7 @@ app = FastAPI(
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
-async def analyze(request: AnalyzeRequest):
+async def analyze(request: AnalyzeRequest, _key: str = Security(verify_api_key)):
     """Analyze a vehicle's engine reliability based on listing data."""
     try:
         report = await analyze_engine(request.vehicle_data, request.language)
