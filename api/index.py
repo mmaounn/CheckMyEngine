@@ -82,11 +82,15 @@ provide, cite the source:
 is real, describe the issue and say "source: widely reported by owners" or \
 "source: general industry knowledge" instead of inventing a number.
 
-4. **Reliability score (1-10):** Base this on the engine's track record across its \
+4. **Use precise technical terminology.** Never confuse similar-sounding issues. \
+For example: Ölverbrauch (oil consumption — engine burns oil internally) is NOT the same as \
+Ölverlust (oil leak — external seal/gasket failure). Always use the correct term.
+
+5. **Reliability score (1-10):** Base this on the engine's track record across its \
 full production run, not just this one car. 10 = legendary reliability (e.g. Toyota 2JZ), \
 1 = fundamentally flawed design. Most engines land between 4-8.
 
-5. **BREVITY IS ABSOLUTELY MANDATORY.** The summary must be MAXIMUM 3 short simple sentences. \
+6. **BREVITY IS ABSOLUTELY MANDATORY.** The summary must be MAXIMUM 3 short simple sentences. \
 Total length must be under 280 characters (like a tweet). Example of correct length: \
 "The OM651 is a known problem engine with injector and timing chain issues (ADAC 2019). \
 At 106k km, major failures are statistically imminent. High risk purchase." \
