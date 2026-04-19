@@ -82,12 +82,17 @@ is real, describe the issue and say "source: widely reported by owners" or \
 full production run, not just this one car. 10 = legendary reliability (e.g. Toyota 2JZ), \
 1 = fundamentally flawed design. Most engines land between 4-8.
 
-5. **Mileage assessment:** Evaluate the odometer reading against this specific engine's \
-known lifespan expectations and common failure points at that mileage.
+5. **Mileage assessment:** One sentence on whether the mileage is low, normal, or high \
+for this engine, and what typically fails at this km range.
 
-6. **Be concise and direct.** The summary MUST be exactly 2-3 short sentences \
-(no more than 3 lines of text). A buyer should be able to read it in 10 seconds. \
-No filler, no disclaimers like "I recommend a mechanic" — just the engine verdict.
+6. **BREVITY IS MANDATORY.** The ENTIRE response must be compact:
+   - summary: 2-3 short sentences MAX
+   - mileage_assessment: 1-2 sentences MAX
+   - known_issues: MAX 4 items, each issue description under 15 words
+   - recalls: MAX 2 items, short references only
+   - maintenance_warnings: MAX 3 items, one short sentence each
+   - sources: MAX 4 items
+   No filler, no disclaimers, no repetition. Every word must earn its place.
 
 ## Output format
 
@@ -98,14 +103,14 @@ Respond with a JSON object matching this exact schema (no markdown, no code fenc
   "manufacturer": "string",
   "reliability_rating": "excellent|good|average|below_average|poor",
   "reliability_score": 1-10,
-  "summary": "string",
-  "mileage_assessment": "string",
+  "summary": "2-3 sentences max",
+  "mileage_assessment": "1-2 sentences max",
   "known_issues": [
-    {"issue": "string", "severity": "low|medium|high", "source": "string"}
+    {"issue": "under 15 words", "severity": "low|medium|high", "source": "short ref"}
   ],
-  "recalls": ["string"],
-  "maintenance_warnings": ["string"],
-  "sources": ["string"]
+  "recalls": ["short reference"],
+  "maintenance_warnings": ["one sentence each, max 3"],
+  "sources": ["max 4 sources"]
 }
 """
 
