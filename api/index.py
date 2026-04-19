@@ -155,6 +155,8 @@ app = FastAPI(
     title="CheckMyEngine API",
     description="Analyze car engine reputation and reliability from vehicle listing data.",
     version="1.0.0",
+    docs_url="/api/docs",
+    openapi_url="/api/openapi.json",
 )
 
 
