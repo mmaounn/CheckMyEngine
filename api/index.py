@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class AnalyzeRequest(BaseModel):
     vehicle_data: str = Field(
         ...,
-        description="Free-text vehicle listing string with specs (make, model, year, mileage, etc.)",
+        description="Free-text vehicle listing string with specs (make, model, year, mileage, etc.). Can be in any language.",
         min_length=10,
         examples=[
             (
@@ -22,6 +22,11 @@ class AnalyzeRequest(BaseModel):
                 "Cylinder capacity: 2,143 ccm"
             )
         ],
+    )
+    language: str = Field(
+        default="en",
+        description="Response language: 'en' for English, 'de' for German",
+        examples=["en", "de"],
     )
 
 
@@ -46,7 +51,8 @@ exact engine in a vehicle listing and produce a factual reliability report.
 ## Rules
 
 1. **Identify the engine code** from the vehicle make, model, year, displacement, \
-and power output. Be specific (e.g. "OM651 DE 22 LA" not just "diesel engine").
+and power output. Be specific (e.g. "OM651 DE 22 LA" not just "diesel engine"). \
+The input listing may be in any language (English, German, etc.) — parse it regardless.
 
 2. **Every claim must be traceable.** For each known issue, recall, or rating you \
 provide, cite the source:
@@ -87,10 +93,17 @@ Respond with ONLY this JSON (no markdown, no code fences):
 
 # --- Engine Analyzer ---
 
-async def analyze_engine(vehicle_data: str) -> EngineReport:
+LANGUAGE_INSTRUCTIONS = {
+    "en": "Write the summary in English.",
+    "de": "Schreibe die Zusammenfassung auf Deutsch.",
+}
+
+
+async def analyze_engine(vehicle_data: str, language: str = "en") -> EngineReport:
     """Send vehicle data to Claude and get a structured engine reliability report."""
     api_key = os.environ["ANTHROPIC_API_KEY"]
     client = anthropic.AsyncAnthropic(api_key=api_key)
+    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["en"])
 
     message = await client.messages.create(
         model="claude-sonnet-4-6",
@@ -101,7 +114,7 @@ async def analyze_engine(vehicle_data: str) -> EngineReport:
                 "role": "user",
                 "content": (
                     "Analyze the engine in this vehicle listing and produce "
-                    "the reliability report as JSON:\n\n"
+                    f"the reliability report as JSON. {lang_instruction}\n\n"
                     f"{vehicle_data}"
                 ),
             }
@@ -132,7 +145,7 @@ app = FastAPI(
 async def analyze(request: AnalyzeRequest):
     """Analyze a vehicle's engine reliability based on listing data."""
     try:
-        report = await analyze_engine(request.vehicle_data)
+        report = await analyze_engine(request.vehicle_data, request.language)
         return AnalyzeResponse(success=True, report=report)
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"Failed to parse engine analysis: {e}")
