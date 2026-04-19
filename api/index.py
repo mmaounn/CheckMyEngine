@@ -25,24 +25,10 @@ class AnalyzeRequest(BaseModel):
     )
 
 
-class KnownIssue(BaseModel):
-    issue: str = Field(description="Description of the known issue")
-    severity: str = Field(description="low, medium, or high")
-    source: str = Field(description="Where this information comes from (e.g. TSB number, recall ID, forum, publication)")
-
-
 class EngineReport(BaseModel):
     engine_code: str = Field(description="The identified engine code/designation (e.g. OM651)")
-    engine_family: str = Field(description="Engine family or series name")
-    manufacturer: str = Field(description="Engine manufacturer")
-    reliability_rating: str = Field(description="Rating: excellent, good, average, below_average, poor")
     reliability_score: int = Field(description="Score from 1-10, where 10 is most reliable", ge=1, le=10)
-    summary: str = Field(description="Brief 2-3 sentence verdict on this engine's reputation")
-    mileage_assessment: str = Field(description="Assessment of the odometer reading relative to this engine's expected lifespan")
-    known_issues: list[KnownIssue] = Field(description="Known problems with references")
-    recalls: list[str] = Field(description="Relevant recall campaigns with IDs where available")
-    maintenance_warnings: list[str] = Field(description="Key maintenance items to check at this mileage")
-    sources: list[str] = Field(description="References: publications, databases, TSBs, forums cited")
+    summary: str = Field(description="2-3 sentence verdict on engine reputation, reliability, and mileage risk")
 
 
 class AnalyzeResponse(BaseModel):
@@ -82,35 +68,17 @@ is real, describe the issue and say "source: widely reported by owners" or \
 full production run, not just this one car. 10 = legendary reliability (e.g. Toyota 2JZ), \
 1 = fundamentally flawed design. Most engines land between 4-8.
 
-5. **Mileage assessment:** One sentence on whether the mileage is low, normal, or high \
-for this engine, and what typically fails at this km range.
-
-6. **BREVITY IS MANDATORY.** The ENTIRE response must be compact:
-   - summary: 2-3 short sentences MAX
-   - mileage_assessment: 1-2 sentences MAX
-   - known_issues: MAX 4 items, each issue description under 15 words
-   - recalls: MAX 2 items, short references only
-   - maintenance_warnings: MAX 3 items, one short sentence each
-   - sources: MAX 4 items
-   No filler, no disclaimers, no repetition. Every word must earn its place.
+5. **BREVITY IS MANDATORY.** The summary must be exactly 2-3 short sentences that cover: \
+engine reputation, key risks at this mileage, and a buyer verdict. Mention 1-2 key sources \
+inline (e.g. "per ADAC data" or "known TSB issue"). No filler, no disclaimers.
 
 ## Output format
 
-Respond with a JSON object matching this exact schema (no markdown, no code fences):
+Respond with ONLY this JSON (no markdown, no code fences):
 {
   "engine_code": "string",
-  "engine_family": "string",
-  "manufacturer": "string",
-  "reliability_rating": "excellent|good|average|below_average|poor",
   "reliability_score": 1-10,
-  "summary": "2-3 sentences max",
-  "mileage_assessment": "1-2 sentences max",
-  "known_issues": [
-    {"issue": "under 15 words", "severity": "low|medium|high", "source": "short ref"}
-  ],
-  "recalls": ["short reference"],
-  "maintenance_warnings": ["one sentence each, max 3"],
-  "sources": ["max 4 sources"]
+  "summary": "2-3 sentences max, with inline source references"
 }
 """
 
@@ -124,7 +92,7 @@ async def analyze_engine(vehicle_data: str) -> EngineReport:
 
     message = await client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=2048,
+        max_tokens=512,
         system=SYSTEM_PROMPT,
         messages=[
             {
