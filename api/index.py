@@ -127,7 +127,7 @@ async def analyze_engine(vehicle_data: str, language: str | None = None) -> Engi
         lang_instruction = AUTO_DETECT_INSTRUCTION
 
     message = await client.messages.create(
-        model="claude-opus-4-7",
+        model="claude-sonnet-4-6",
         max_tokens=1024,
         temperature=0,
         system=SYSTEM_PROMPT,
