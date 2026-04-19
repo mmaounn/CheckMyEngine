@@ -1,37 +1,36 @@
 # CheckMyEngine — Development Progress
 
 ## Project Goal
-Public API that accepts car vehicle data (make, model, year, mileage, specs) and returns engine reputation/reliability analysis powered by Claude API.
+Public API that accepts car vehicle data and returns engine reputation analysis powered by Claude API.
 
 ## Tech Stack
 - **Language:** Python 3.11+
-- **Framework:** FastAPI (async, auto-docs, validation)
-- **AI Backend:** Anthropic Claude API (claude-sonnet-4-6)
-- **Deployment:** Ubuntu with uvicorn + nginx
-
-## Files
-- `main.py` — FastAPI app with `/analyze` and `/health` endpoints
-- `engine_analyzer.py` — Claude API integration with source-referenced prompt
-- `models.py` — Pydantic models (request, response, EngineReport, KnownIssue)
-- `config.py` — Settings loaded from .env
-- `requirements.txt` — Python dependencies
-- `.env.example` — API key template
+- **Framework:** FastAPI
+- **AI Backend:** Claude Sonnet 4.6
+- **Hosting:** Vercel (serverless)
+- **Source:** github.com/mmaounn/CheckMyEngine (public)
+- **Live URL:** https://check-my-engine.vercel.app/api/analyze
 
 ## Progress
-- [x] Project initialized
-- [x] Tech stack chosen (Python + FastAPI + Claude API)
-- [x] Project structure setup
-- [x] Pydantic models (AnalyzeRequest, EngineReport, KnownIssue, AnalyzeResponse)
-- [x] Claude prompt — demands cited sources (TSBs, recalls, ADAC, TÜV, NHTSA, forums)
-- [x] Core `/analyze` endpoint
-- [x] Summary constrained to 2-3 lines max
-- [ ] Test locally
-- [ ] Deployment config (systemd, nginx)
-- [ ] API key auth for public consumers
+- [x] Core API with /analyze and /health endpoints
+- [x] Claude prompt with sourced engine analysis (ADAC, TUV, KBA, TSBs)
+- [x] Brief summary (2-3 sentences, ~280 chars)
+- [x] Auto-detect response language from input
+- [x] Manual language override (en/de)
+- [x] API key authentication (X-API-Key header)
+- [x] Deployed on Vercel
+- [x] Pushed to GitHub
 - [ ] Rate limiting
+- [ ] Usage tracking / analytics
+- [ ] More language support beyond en/de
 
-## Key Design Decisions
-- Claude prompt explicitly forbids fabricating source IDs — says "widely reported" if unsure
-- Reliability score 1-10 based on full engine production run, not just the one car
-- Mileage assessed against engine-specific lifespan expectations
-- Summary kept to 2-3 short sentences for quick buyer decisions
+## API Usage
+```
+POST /api/analyze
+Header: X-API-Key: <your-key>
+Header: Content-Type: application/json
+Body: {"vehicle_data": "...", "language": "en|de|null"}
+```
+
+## Cost
+~$0.005 per query (~$5 per 1,000 queries)
