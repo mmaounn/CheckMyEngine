@@ -20,6 +20,7 @@ Public API that accepts car vehicle data and returns engine reputation analysis 
 - [x] API key authentication (X-API-Key header)
 - [x] Deployed on Vercel
 - [x] Pushed to GitHub
+- [x] Structured scoring rubric (design/mileage/usage/age sub-scores + failure-window)
 - [ ] Rate limiting
 - [ ] Usage tracking / analytics
 - [ ] More language support beyond en/de
