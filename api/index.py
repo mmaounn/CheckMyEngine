@@ -76,6 +76,14 @@ class FailureOnset(BaseModel):
     )
 
 
+class ExtractedSpecs(BaseModel):
+    engine_variant_code: str | None = Field(default=None, description="Engine variant code printed on the Fahrzeugschein (e.g. 'ACGLCF1', 'CFGC').")
+    displacement_ccm: int | None = Field(default=None, ge=0, description="Cylinder displacement in cm³.")
+    power_kw: int | None = Field(default=None, ge=0, description="Rated power in kilowatts.")
+    first_registration: str | None = Field(default=None, description="Date of first registration in YYYY-MM-DD.")
+    emissions_class: str | None = Field(default=None, description="Emissions class (e.g. 'EURO5', 'EURO6').")
+
+
 def compute_reliability_score(sub_scores: "SubScores") -> int:
     """Weighted-average of sub-scores, rounded and clamped to [1, 10]."""
     raw = (
@@ -102,6 +110,39 @@ class AnalyzeResponse(BaseModel):
 
 
 # --- Claude Prompt ---
+
+EXTRACTION_PROMPT = """\
+You are extracting technical engine identification fields from a photograph of a German \
+Zulassungsbescheinigung Teil I (Fahrzeugschein / vehicle registration document). Your \
+ONLY job is to read the printed technical fields and return structured JSON. Do NOT \
+interpret, score, or comment.
+
+Extract EXACTLY these fields, all optional (return null if not legible):
+- engine_variant_code: the engine variant code (often alphanumeric like "ACGLCF1", \
+"CFGC", "OM651DE22LA"). Usually appears in a short alphanumeric code field near the \
+model code.
+- displacement_ccm: engine displacement in cubic centimeters, integer (e.g. 1968).
+- power_kw: rated power in kilowatts, integer (e.g. 126).
+- first_registration: date of first registration in ISO format YYYY-MM-DD.
+- emissions_class: emissions class string (e.g. "EURO5", "EURO6", "EURO6d").
+
+Do NOT extract or mention: VIN/FIN, holder name, holder address, license plate, \
+registration authority, stamps, signatures, colors, vehicle class, body type, wheel \
+specs, mass figures, or anything else. Those fields are explicitly out of scope.
+
+If the image is not a Fahrzeugschein, is unreadable, or shows no legible technical \
+fields, return all fields as null.
+
+Respond with ONLY this JSON (no markdown, no code fences):
+{
+  "engine_variant_code": "string or null",
+  "displacement_ccm": integer or null,
+  "power_kw": integer or null,
+  "first_registration": "YYYY-MM-DD or null",
+  "emissions_class": "string or null"
+}
+"""
+
 
 SYSTEM_PROMPT = """\
 You are an automotive engine reliability analyst. Your job is to identify the \
