@@ -40,11 +40,6 @@ class AnalyzeRequest(BaseModel):
         description="Response language: 'en', 'de', etc. If omitted, auto-detects from input language.",
         examples=["en", "de"],
     )
-    vehicle_doc_image_url: str | None = Field(
-        default=None,
-        description="Optional https URL to a photograph of the Fahrzeugschein (vehicle registration document). If provided, Claude extracts engine-identification fields from the image and prepends them to vehicle_data before analysis. Failures fall back to text-only analysis.",
-        examples=["https://img-pa.auto1.com/img4c/.../max-EW55233_....jpg"],
-    )
 
 
 class SubScores(BaseModel):
@@ -81,14 +76,6 @@ class FailureOnset(BaseModel):
     )
 
 
-class ExtractedSpecs(BaseModel):
-    engine_variant_code: str | None = Field(default=None, description="Engine variant code printed on the Fahrzeugschein (e.g. 'ACGLCF1', 'CFGC').")
-    displacement_ccm: int | None = Field(default=None, ge=0, description="Cylinder displacement in cm³.")
-    power_kw: int | None = Field(default=None, ge=0, description="Rated power in kilowatts.")
-    first_registration: str | None = Field(default=None, description="Date of first registration in YYYY-MM-DD.")
-    emissions_class: str | None = Field(default=None, description="Emissions class (e.g. 'EURO5', 'EURO6').")
-
-
 def compute_reliability_score(sub_scores: "SubScores") -> int:
     """Weighted-average of sub-scores, rounded and clamped to [1, 10]."""
     raw = (
@@ -98,82 +85,6 @@ def compute_reliability_score(sub_scores: "SubScores") -> int:
         + 0.1 * sub_scores.age
     )
     return max(1, min(10, round(raw)))
-
-
-async def extract_specs_from_image(url: str) -> tuple[ExtractedSpecs | None, str | None]:
-    """Call Claude vision with the Fahrzeugschein URL and parse the structured response.
-
-    Returns (specs, None) when at least one field was extracted.
-    Returns (None, error_code) on any failure or when all fields are null.
-    Never raises.
-    """
-    if not url.startswith("https://"):
-        return None, "invalid_url_scheme"
-
-    try:
-        api_key = os.environ["ANTHROPIC_API_KEY"]
-        client = anthropic.AsyncAnthropic(api_key=api_key)
-        message = await client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=300,
-            temperature=0,
-            system=EXTRACTION_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {"type": "url", "url": url},
-                        },
-                        {
-                            "type": "text",
-                            "text": "Extract the engine identification fields from this Fahrzeugschein. Return only the JSON.",
-                        },
-                    ],
-                }
-            ],
-        )
-        raw = message.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1]
-            raw = raw.rsplit("```", 1)[0].strip()
-    except Exception:
-        return None, "extraction_call_failed"
-
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError:
-        return None, "extraction_parse_failed"
-
-    try:
-        specs = ExtractedSpecs(**data)
-    except Exception:
-        return None, "extraction_parse_failed"
-
-    if all(v is None for v in specs.model_dump().values()):
-        return None, "unreadable_document"
-
-    return specs, None
-
-
-def _format_extracted_block(specs: ExtractedSpecs) -> str | None:
-    """Format non-null fields as the prepended `[Extracted from vehicle registration]`
-    block. Returns None if every field is null."""
-    lines: list[str] = []
-    if specs.engine_variant_code is not None:
-        lines.append(f"engine_variant_code: {specs.engine_variant_code}")
-    if specs.displacement_ccm is not None:
-        lines.append(f"displacement_ccm: {specs.displacement_ccm}")
-    if specs.power_kw is not None:
-        lines.append(f"power_kw: {specs.power_kw}")
-    if specs.first_registration is not None:
-        lines.append(f"first_registration: {specs.first_registration}")
-    if specs.emissions_class is not None:
-        lines.append(f"emissions_class: {specs.emissions_class}")
-    if not lines:
-        return None
-    return "[Extracted from vehicle registration]\n" + "\n".join(lines)
 
 
 class EngineReport(BaseModel):
@@ -187,45 +98,10 @@ class EngineReport(BaseModel):
 class AnalyzeResponse(BaseModel):
     success: bool
     report: EngineReport | None = None
-    image_used: bool = False
-    image_error: str | None = None
     error: str | None = None
 
 
 # --- Claude Prompt ---
-
-EXTRACTION_PROMPT = """\
-You are extracting technical engine identification fields from a photograph of a German \
-Zulassungsbescheinigung Teil I (Fahrzeugschein / vehicle registration document). Your \
-ONLY job is to read the printed technical fields and return structured JSON. Do NOT \
-interpret, score, or comment.
-
-Extract EXACTLY these fields, all optional (return null if not legible):
-- engine_variant_code: the engine variant code (often alphanumeric like "ACGLCF1", \
-"CFGC", "OM651DE22LA"). Usually appears in a short alphanumeric code field near the \
-model code.
-- displacement_ccm: engine displacement in cubic centimeters, integer (e.g. 1968).
-- power_kw: rated power in kilowatts, integer (e.g. 126).
-- first_registration: date of first registration in ISO format YYYY-MM-DD.
-- emissions_class: emissions class string (e.g. "EURO5", "EURO6", "EURO6d").
-
-Do NOT extract or mention: VIN/FIN, holder name, holder address, license plate, \
-registration authority, stamps, signatures, colors, vehicle class, body type, wheel \
-specs, mass figures, or anything else. Those fields are explicitly out of scope.
-
-If the image is not a Fahrzeugschein, is unreadable, or shows no legible technical \
-fields, return all fields as null.
-
-Respond with ONLY this JSON (no markdown, no code fences):
-{
-  "engine_variant_code": "string or null",
-  "displacement_ccm": integer or null,
-  "power_kw": integer or null,
-  "first_registration": "YYYY-MM-DD or null",
-  "emissions_class": "string or null"
-}
-"""
-
 
 SYSTEM_PROMPT = """\
 You are an automotive engine reliability analyst. Your job is to identify the \
@@ -262,13 +138,6 @@ tuning note explicitly describes it (e.g. "Chiptuning", "Leistungssteigerung", \
 "ECU remap", "performance software"). Accessory retrofits such as trailer hitch \
 (AHK), auxiliary heater (Standheizung), audio system, or lighting upgrades are \
 NOT engine tuning and must not be treated as wear/warranty risk.
-
-6. **Registration-document priority.** If the input begins with a \
-`[Extracted from vehicle registration]` block, treat those fields as \
-authoritative for engine identification. If they conflict with the \
-listing text (e.g. listing says "177 HP" but registration says \
-"126 kW" which is 171 HP), prefer the registration values. Use the \
-`engine_variant_code` as the primary engine identifier.
 
 ## Rubric (sub-scores, 1-10 each)
 
@@ -336,32 +205,9 @@ LANGUAGE_INSTRUCTIONS = {
 AUTO_DETECT_INSTRUCTION = "Write the summary in the same language as the vehicle listing input."
 
 
-async def analyze_engine(
-    vehicle_data: str,
-    language: str | None = None,
-    vehicle_doc_image_url: str | None = None,
-) -> tuple[EngineReport, bool, str | None]:
-    """Send vehicle data (optionally enriched by a Fahrzeugschein image) to Claude,
-    parse the structured rubric output, and compute the final reliability_score.
-
-    Returns (report, image_used, image_error).
-    """
-    image_used = False
-    image_error: str | None = None
-    merged_vehicle_data = vehicle_data
-
-    if vehicle_doc_image_url is not None:
-        specs, error = await extract_specs_from_image(vehicle_doc_image_url)
-        if specs is not None:
-            block = _format_extracted_block(specs)
-            if block is not None:
-                merged_vehicle_data = f"{block}\n\n[Listing text]\n{vehicle_data}"
-                image_used = True
-            else:
-                image_error = "unreadable_document"
-        else:
-            image_error = error
-
+async def analyze_engine(vehicle_data: str, language: str | None = None) -> EngineReport:
+    """Send vehicle data to Claude, parse the structured rubric output, and
+    compute the final reliability_score from the sub-scores."""
     api_key = os.environ["ANTHROPIC_API_KEY"]
     client = anthropic.AsyncAnthropic(api_key=api_key)
     if language:
@@ -380,7 +226,7 @@ async def analyze_engine(
                 "content": (
                     "Analyze the engine in this vehicle listing and produce "
                     f"the reliability report as JSON. {lang_instruction}\n\n"
-                    f"{merged_vehicle_data}"
+                    f"{vehicle_data}"
                 ),
             }
         ],
@@ -388,6 +234,7 @@ async def analyze_engine(
 
     raw = message.content[0].text.strip()
 
+    # Handle case where model wraps JSON in code fences despite instructions
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
@@ -398,15 +245,13 @@ async def analyze_engine(
     failure_onset = FailureOnset(**data["typical_failure_onset"])
     reliability_score = compute_reliability_score(sub_scores)
 
-    report = EngineReport(
+    return EngineReport(
         engine_code=data["engine_code"],
         reliability_score=reliability_score,
         sub_scores=sub_scores,
         typical_failure_onset=failure_onset,
         summary=data["summary"],
     )
-
-    return report, image_used, image_error
 
 
 # --- FastAPI App ---
@@ -422,20 +267,10 @@ app = FastAPI(
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
 async def analyze(request: AnalyzeRequest, _key: str = Security(verify_api_key)):
-    """Analyze a vehicle's engine reliability based on listing data and an optional
-    Fahrzeugschein image URL."""
+    """Analyze a vehicle's engine reliability based on listing data."""
     try:
-        report, image_used, image_error = await analyze_engine(
-            request.vehicle_data,
-            request.language,
-            request.vehicle_doc_image_url,
-        )
-        return AnalyzeResponse(
-            success=True,
-            report=report,
-            image_used=image_used,
-            image_error=image_error,
-        )
+        report = await analyze_engine(request.vehicle_data, request.language)
+        return AnalyzeResponse(success=True, report=report)
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"Failed to parse engine analysis: {e}")
     except Exception as e:
