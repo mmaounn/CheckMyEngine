@@ -118,7 +118,7 @@ async def analyze_engine(vehicle_data: str) -> EngineReport:
     client = anthropic.AsyncAnthropic(api_key=api_key)
 
     message = await client.messages.create(
-        model="claude-3-5-sonnet-latest",
+        model="claude-3-haiku-20240307",
         max_tokens=2048,
         system=SYSTEM_PROMPT,
         messages=[
@@ -168,3 +168,19 @@ async def analyze(request: AnalyzeRequest):
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/debug-models")
+async def debug_models():
+    """Temporary endpoint to check which models are available."""
+    import httpx
+    api_key = os.environ["ANTHROPIC_API_KEY"]
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://api.anthropic.com/v1/models",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+            },
+        )
+        return resp.json()
