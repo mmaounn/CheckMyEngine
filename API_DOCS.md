@@ -83,8 +83,18 @@ curl -X POST https://check-my-engine.vercel.app/api/analyze \
   "success": true,
   "report": {
     "engine_code": "OM651 DE 22 LA",
-    "reliability_score": 4,
-    "summary": "The OM651 is a known problem engine with injector and timing chain issues (ADAC 2019). At 106k km, major failures are statistically imminent. High risk purchase."
+    "reliability_score": 5,
+    "sub_scores": {
+      "design": 5,
+      "mileage": 5,
+      "usage": 7,
+      "age": 6
+    },
+    "typical_failure_onset": {
+      "years": 8,
+      "mileage_km": 130000
+    },
+    "summary": "The OM651 has known injector and timing-chain issues (ADAC). At ~106k km the car is approaching the typical failure window. Moderate risk; inspect timing chain and injectors before purchase."
   },
   "error": null
 }
@@ -96,9 +106,17 @@ curl -X POST https://check-my-engine.vercel.app/api/analyze \
 |-------|------|-------------|
 | `success` | boolean | Whether the analysis succeeded |
 | `report.engine_code` | string | Identified engine code (e.g. "OM651", "N47D20C", "CFCA") |
-| `report.reliability_score` | integer | Reliability rating from 1 (worst) to 10 (best) |
+| `report.reliability_score` | integer | Final 1–10 rating, computed as a weighted average of sub-scores |
+| `report.sub_scores.design` | integer | 1–10. Intrinsic engine-family quality |
+| `report.sub_scores.mileage` | integer | 1–10. Position within the typical failure window |
+| `report.sub_scores.usage` | integer | 1–10. Ownership, commercial-use, and accident history |
+| `report.sub_scores.age` | integer | 1–10. Age since first registration |
+| `report.typical_failure_onset.years` | integer | Typical age in years when issues start for this engine |
+| `report.typical_failure_onset.mileage_km` | integer | Typical odometer reading when issues start |
 | `report.summary` | string | 2-3 sentence verdict with cited sources |
 | `error` | string or null | Error message if the analysis failed |
+
+The final score is computed server-side as `round(0.4*design + 0.3*mileage + 0.2*usage + 0.1*age)`, clamped to `[1, 10]`.
 
 #### Reliability Score Guide
 
