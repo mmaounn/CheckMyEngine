@@ -95,6 +95,82 @@ def compute_reliability_score(sub_scores: "SubScores") -> int:
     return max(1, min(10, round(raw)))
 
 
+async def extract_specs_from_image(url: str) -> tuple[ExtractedSpecs | None, str | None]:
+    """Call Claude vision with the Fahrzeugschein URL and parse the structured response.
+
+    Returns (specs, None) when at least one field was extracted.
+    Returns (None, error_code) on any failure or when all fields are null.
+    Never raises.
+    """
+    if not url.startswith("https://"):
+        return None, "invalid_url_scheme"
+
+    try:
+        api_key = os.environ["ANTHROPIC_API_KEY"]
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        message = await client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=300,
+            temperature=0,
+            system=EXTRACTION_PROMPT,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {"type": "url", "url": url},
+                        },
+                        {
+                            "type": "text",
+                            "text": "Extract the engine identification fields from this Fahrzeugschein. Return only the JSON.",
+                        },
+                    ],
+                }
+            ],
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1]
+            raw = raw.rsplit("```", 1)[0].strip()
+    except Exception:
+        return None, "extraction_call_failed"
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, "extraction_parse_failed"
+
+    try:
+        specs = ExtractedSpecs(**data)
+    except Exception:
+        return None, "extraction_parse_failed"
+
+    if all(v is None for v in specs.model_dump().values()):
+        return None, "unreadable_document"
+
+    return specs, None
+
+
+def _format_extracted_block(specs: ExtractedSpecs) -> str | None:
+    """Format non-null fields as the prepended `[Extracted from vehicle registration]`
+    block. Returns None if every field is null."""
+    lines: list[str] = []
+    if specs.engine_variant_code is not None:
+        lines.append(f"engine_variant_code: {specs.engine_variant_code}")
+    if specs.displacement_ccm is not None:
+        lines.append(f"displacement_ccm: {specs.displacement_ccm}")
+    if specs.power_kw is not None:
+        lines.append(f"power_kw: {specs.power_kw}")
+    if specs.first_registration is not None:
+        lines.append(f"first_registration: {specs.first_registration}")
+    if specs.emissions_class is not None:
+        lines.append(f"emissions_class: {specs.emissions_class}")
+    if not lines:
+        return None
+    return "[Extracted from vehicle registration]\n" + "\n".join(lines)
+
+
 class EngineReport(BaseModel):
     engine_code: str = Field(description="The identified engine code/designation (e.g. OM651)")
     reliability_score: int = Field(description="Final 1-10 score computed from sub-scores (weighted average).", ge=1, le=10)
