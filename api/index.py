@@ -23,9 +23,9 @@ class AnalyzeRequest(BaseModel):
             )
         ],
     )
-    language: str = Field(
-        default="en",
-        description="Response language: 'en' for English, 'de' for German",
+    language: str | None = Field(
+        default=None,
+        description="Response language: 'en', 'de', etc. If omitted, auto-detects from input language.",
         examples=["en", "de"],
     )
 
@@ -98,12 +98,17 @@ LANGUAGE_INSTRUCTIONS = {
     "de": "Schreibe die Zusammenfassung auf Deutsch.",
 }
 
+AUTO_DETECT_INSTRUCTION = "Write the summary in the same language as the vehicle listing input."
 
-async def analyze_engine(vehicle_data: str, language: str = "en") -> EngineReport:
+
+async def analyze_engine(vehicle_data: str, language: str | None = None) -> EngineReport:
     """Send vehicle data to Claude and get a structured engine reliability report."""
     api_key = os.environ["ANTHROPIC_API_KEY"]
     client = anthropic.AsyncAnthropic(api_key=api_key)
-    lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["en"])
+    if language:
+        lang_instruction = LANGUAGE_INSTRUCTIONS.get(language, f"Write the summary in {language}.")
+    else:
+        lang_instruction = AUTO_DETECT_INSTRUCTION
 
     message = await client.messages.create(
         model="claude-sonnet-4-6",
