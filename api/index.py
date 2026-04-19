@@ -118,7 +118,7 @@ async def analyze_engine(vehicle_data: str) -> EngineReport:
     client = anthropic.AsyncAnthropic(api_key=api_key)
 
     message = await client.messages.create(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-3-5-sonnet-latest",
         max_tokens=2048,
         system=SYSTEM_PROMPT,
         messages=[
