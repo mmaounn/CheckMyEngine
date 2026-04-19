@@ -40,6 +40,11 @@ class AnalyzeRequest(BaseModel):
         description="Response language: 'en', 'de', etc. If omitted, auto-detects from input language.",
         examples=["en", "de"],
     )
+    vehicle_doc_image_url: str | None = Field(
+        default=None,
+        description="Optional https URL to a photograph of the Fahrzeugschein (vehicle registration document). If provided, Claude extracts engine-identification fields from the image and prepends them to vehicle_data before analysis. Failures fall back to text-only analysis.",
+        examples=["https://img-pa.auto1.com/img4c/.../max-EW55233_....jpg"],
+    )
 
 
 class SubScores(BaseModel):
@@ -182,6 +187,8 @@ class EngineReport(BaseModel):
 class AnalyzeResponse(BaseModel):
     success: bool
     report: EngineReport | None = None
+    image_used: bool = False
+    image_error: str | None = None
     error: str | None = None
 
 
