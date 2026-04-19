@@ -68,9 +68,11 @@ is real, describe the issue and say "source: widely reported by owners" or \
 full production run, not just this one car. 10 = legendary reliability (e.g. Toyota 2JZ), \
 1 = fundamentally flawed design. Most engines land between 4-8.
 
-5. **BREVITY IS MANDATORY.** The summary must be exactly 2-3 short sentences that cover: \
-engine reputation, key risks at this mileage, and a buyer verdict. Mention 1-2 key sources \
-inline (e.g. "per ADAC data" or "known TSB issue"). No filler, no disclaimers.
+5. **BREVITY IS ABSOLUTELY MANDATORY.** The summary must be MAXIMUM 3 short simple sentences. \
+Total length must be under 280 characters (like a tweet). Example of correct length: \
+"The OM651 is a known problem engine with injector and timing chain issues (ADAC 2019). \
+At 106k km, major failures are statistically imminent. High risk purchase." \
+Do NOT write long compound sentences. Do NOT list specific part names. Just the verdict.
 
 ## Output format
 
